@@ -91,6 +91,7 @@ body {
 .badge-high { background: rgba(239,68,68,0.15); color: var(--red); }
 .badge-medium { background: rgba(245,158,11,0.15); color: var(--amber); }
 .badge-low { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge-isolated { background: rgba(100,116,139,0.15); color: #64748b; }
 
 /* ─── Pulse Animation ────────────────────────────────────────────────────── */
 
@@ -109,6 +110,14 @@ body {
 }
 .connection-dot {
   animation: connection-dot 2s ease-in-out infinite;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
 }
 
 /* ─── Layout ─────────────────────────────────────────────────────────────── */

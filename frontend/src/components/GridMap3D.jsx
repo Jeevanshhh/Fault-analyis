@@ -43,58 +43,69 @@ const STATUS_COLORS = {
     warning: '#f59e0b',
 }
 
-/* ─── Animated Node Sphere ─────────────────────────────────────────────────── */
+/* ─── Fault Spark Particles (electric arc effect around faulted node) ──────── */
 
-/* ─── Spark Effect for Faults ──────────────────────────────────────────────── */
-
-function SparkEffect({ position }) {
-    const points = useMemo(() => {
-        const p = []
-        for (let i = 0; i < 15; i++) {
-            p.push(new THREE.Vector3(
-                (Math.random() - 0.5) * 0.8,
-                (Math.random() - 0.5) * 0.8,
-                (Math.random() - 0.5) * 0.8
-            ))
-        }
-        return p
+function FaultSparks({ position }) {
+    const groupRef = useRef()
+    const sparkCount = 12
+    const sparks = useMemo(() => {
+        return Array.from({ length: sparkCount }, (_, i) => ({
+            angle: (i / sparkCount) * Math.PI * 2,
+            speed: 1.5 + Math.random() * 2,
+            radius: 0.3 + Math.random() * 0.4,
+            phase: Math.random() * Math.PI * 2,
+        }))
     }, [])
 
-    const lines = useMemo(() => {
-        const l = []
-        for (let i = 0; i < 8; i++) {
-            l.push([Math.floor(Math.random() * 15), Math.floor(Math.random() * 15)])
-        }
-        return l
-    }, [])
-
-    const ref = useRef()
     useFrame((state) => {
-        if (ref.current) {
-            ref.current.rotation.x += 0.2
-            ref.current.rotation.y += 0.2
-            const s = 0.8 + Math.sin(state.clock.elapsedTime * 20) * 0.2
-            ref.current.scale.setScalar(s)
-            ref.current.visible = Math.random() > 0.3 // Flickering
+        if (!groupRef.current) return
+        groupRef.current.children.forEach((spark, i) => {
+            const s = sparks[i]
+            const t = state.clock.elapsedTime * s.speed + s.phase
+            const r = s.radius * (0.5 + 0.5 * Math.sin(t * 3))
+            spark.position.x = Math.cos(s.angle + t) * r
+            spark.position.y = Math.sin(s.angle + t * 0.7) * r
+            spark.position.z = Math.sin(t * 2) * 0.15
+            spark.material.opacity = 0.3 + 0.7 * Math.abs(Math.sin(t * 4))
+            spark.scale.setScalar(0.5 + 0.5 * Math.sin(t * 6))
+        })
+    })
+
+    return (
+        <group ref={groupRef} position={position}>
+            {sparks.map((_, i) => (
+                <mesh key={i}>
+                    <boxGeometry args={[0.04, 0.04, 0.12]} />
+                    <meshBasicMaterial color="#ffaa00" transparent opacity={0.8} />
+                </mesh>
+            ))}
+        </group>
+    )
+}
+
+/* ─── Restoration Ring (pulsing amber ring around restored node) ───────────── */
+
+function RestorationRing({ position }) {
+    const ringRef = useRef()
+
+    useFrame((state) => {
+        if (ringRef.current) {
+            const s = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.2
+            ringRef.current.scale.set(s, s, 1)
+            ringRef.current.material.opacity = 0.3 + Math.sin(state.clock.elapsedTime * 4) * 0.2
+            ringRef.current.rotation.z = state.clock.elapsedTime * 0.5
         }
     })
 
     return (
-        <group position={position} ref={ref}>
-            {lines.map(([i, j], idx) => (
-                <Line
-                    key={idx}
-                    points={[points[i], points[j]]}
-                    color="#ffffff"
-                    lineWidth={1.5}
-                    transparent
-                    opacity={0.8}
-                />
-            ))}
-            <pointLight distance={1.5} intensity={5} color="#ef4444" />
-        </group>
+        <mesh ref={ringRef} position={position}>
+            <ringGeometry args={[0.5, 0.6, 32]} />
+            <meshBasicMaterial color="#f59e0b" transparent opacity={0.4} side={THREE.DoubleSide} />
+        </mesh>
     )
 }
+
+/* ─── Animated Node Sphere ─────────────────────────────────────────────────── */
 
 function GridNode({ nodeId, position, nodeData, onClick }) {
     const meshRef = useRef()
@@ -102,6 +113,8 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
     const status = nodeData?.status || 'healthy'
     const color = STATUS_COLORS[status] || '#22c55e'
     const isFault = status === 'fault'
+    const isIsolated = status === 'isolated'
+    const isRestored = status === 'restored'
     const isSource = nodeId === 'bus_1'
     const size = isSource ? 0.4 : 0.28
 
@@ -111,27 +124,35 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
             meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.5 + position[0]) * 0.03
             // Pulse scale on fault
             if (isFault) {
-                const pulse = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.15
+                const pulse = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.2
+                meshRef.current.scale.setScalar(pulse)
+            } else if (isRestored) {
+                const pulse = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.08
                 meshRef.current.scale.setScalar(pulse)
             } else {
                 meshRef.current.scale.setScalar(1)
             }
         }
         if (glowRef.current) {
-            const glowPulse = 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.3
-            glowRef.current.material.opacity = isFault ? glowPulse : 0.15
+            if (isFault) {
+                glowRef.current.material.opacity = 0.3 + Math.sin(state.clock.elapsedTime * 6) * 0.3
+                glowRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 4) * 0.15)
+            } else if (isRestored) {
+                glowRef.current.material.opacity = 0.2 + Math.sin(state.clock.elapsedTime * 2) * 0.1
+                glowRef.current.scale.setScalar(1)
+            } else {
+                glowRef.current.material.opacity = 0.1
+                glowRef.current.scale.setScalar(1)
+            }
         }
     })
 
     return (
         <group position={position} onClick={(e) => { e.stopPropagation(); onClick?.(nodeId, nodeData) }}>
-            {/* Spark effect if faulted */}
-            {isFault && <SparkEffect position={[0, 0, 0]} />}
-
-            {/* Glow sphere */}
+            {/* Outer glow sphere */}
             <mesh ref={glowRef}>
-                <sphereGeometry args={[size * 2, 16, 16]} />
-                <meshBasicMaterial color={color} transparent opacity={0.15} />
+                <sphereGeometry args={[size * 2.5, 16, 16]} />
+                <meshBasicMaterial color={color} transparent opacity={0.1} />
             </mesh>
 
             {/* Main node */}
@@ -140,11 +161,17 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
                 <meshStandardMaterial
                     color={color}
                     emissive={color}
-                    emissiveIntensity={isFault ? 1.5 : 0.4}
+                    emissiveIntensity={isFault ? 2.0 : isRestored ? 0.8 : 0.4}
                     roughness={0.3}
                     metalness={0.7}
                 />
             </mesh>
+
+            {/* Fault sparks */}
+            {isFault && <FaultSparks position={[0, 0, 0]} />}
+
+            {/* Restoration ring */}
+            {isRestored && <RestorationRing position={[0, 0, 0.01]} />}
 
             {/* Label */}
             <Text
@@ -155,7 +182,7 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
                 anchorY="top"
                 font="https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7W0Q5nw.woff2"
             >
-                {nodeId.replace('bus_', 'B')}
+                {isSource ? '⚡ Substation' : nodeId.replace('bus_', 'B')}
             </Text>
 
             {/* Voltage label */}
@@ -170,51 +197,130 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
                     {nodeData.voltage_v?.toFixed(0)}V
                 </Text>
             )}
+
+            {/* Status label for non-healthy */}
+            {(isFault || isIsolated || isRestored) && (
+                <Text
+                    position={[0.45, 0.3, 0]}
+                    fontSize={0.1}
+                    color={color}
+                    anchorX="left"
+                >
+                    {status.toUpperCase()}
+                </Text>
+            )}
         </group>
     )
 }
 
 /* ─── Animated Power Flow Line ─────────────────────────────────────────────── */
 
-function PowerLine({ from, to, isBackup, isFaulted, isActiveRestoration }) {
-    let lineColor = isFaulted ? '#ef4444' : isBackup ? '#334155' : '#1e3a5f'
-    if (isActiveRestoration) lineColor = '#f59e0b'
+function PowerLine({ from, to, isBackup, isFaulted, isActiveBackup }) {
+    const lineRef = useRef()
+    const lineColor = isFaulted ? '#ef4444' : isActiveBackup ? '#f59e0b' : isBackup ? '#1e293b' : '#1e3a5f'
+    const width = isActiveBackup ? 2.5 : isBackup ? 1 : 2
+    const points = useMemo(() => [
+        new THREE.Vector3(...from),
+        new THREE.Vector3(...to),
+    ], [from, to])
 
     return (
-        <Line
-            points={[new THREE.Vector3(...from), new THREE.Vector3(...to)]}
-            color={lineColor}
-            lineWidth={isActiveRestoration ? 3 : (isBackup ? 1 : 2)}
-            dashed={isBackup && !isActiveRestoration}
-            dashScale={5}
-            opacity={isBackup && !isActiveRestoration ? 0.3 : (isActiveRestoration ? 1 : 0.7)}
-            transparent
-        />
+        <>
+            <Line
+                ref={lineRef}
+                points={points}
+                color={lineColor}
+                lineWidth={width}
+                dashed={isBackup && !isActiveBackup}
+                dashScale={5}
+                opacity={isBackup && !isActiveBackup ? 0.2 : isFaulted ? 0.5 : 0.7}
+                transparent
+            />
+            {/* Glow line for active backup feeders */}
+            {isActiveBackup && (
+                <Line
+                    points={points}
+                    color="#f59e0b"
+                    lineWidth={5}
+                    opacity={0.15}
+                    transparent
+                />
+            )}
+        </>
     )
 }
 
-/* ─── Flow Particles ───────────────────────────────────────────────────────── */
+/* ─── Flow Particles (multiple per edge for visible energy flow) ──────────── */
 
-function FlowParticle({ from, to, intensity = 1, color = "#00d4ff" }) {
+function FlowParticles({ from, to, count = 3, color = '#00d4ff', speed = 0.3 }) {
+    const particles = useMemo(() =>
+        Array.from({ length: count }, (_, i) => ({
+            offset: i / count,
+            speedMult: 0.8 + Math.random() * 0.4,
+        })),
+        [count]
+    )
+
+    return (
+        <>
+            {particles.map((p, i) => (
+                <SingleFlowParticle
+                    key={i}
+                    from={from}
+                    to={to}
+                    offset={p.offset}
+                    speed={speed * p.speedMult}
+                    color={color}
+                />
+            ))}
+        </>
+    )
+}
+
+function SingleFlowParticle({ from, to, offset, speed, color }) {
     const ref = useRef()
     const startPos = useMemo(() => new THREE.Vector3(...from), [from])
     const endPos = useMemo(() => new THREE.Vector3(...to), [to])
-    const offset = useMemo(() => Math.random(), [])
 
     useFrame((state) => {
         if (ref.current) {
-            const t = ((state.clock.elapsedTime * (0.3 * intensity) + offset) % 1)
+            const t = ((state.clock.elapsedTime * speed + offset) % 1)
             ref.current.position.lerpVectors(startPos, endPos, t)
-            ref.current.material.opacity = Math.sin(t * Math.PI) * 0.8
+            ref.current.material.opacity = Math.sin(t * Math.PI) * 0.9
+            const s = 0.8 + Math.sin(t * Math.PI) * 0.4
+            ref.current.scale.setScalar(s)
         }
     })
 
-    const size = 0.05 * intensity
+    return (
+        <mesh ref={ref}>
+            <sphereGeometry args={[0.055, 8, 8]} />
+            <meshBasicMaterial color={color} transparent opacity={0.6} />
+        </mesh>
+    )
+}
+
+/* ─── Faulted Line Flicker ─────────────────────────────────────────────────── */
+
+function FaultedLineFlicker({ from, to }) {
+    const ref = useRef()
+    const startPos = useMemo(() => new THREE.Vector3(...from), [from])
+    const endPos = useMemo(() => new THREE.Vector3(...to), [to])
+
+    useFrame((state) => {
+        if (ref.current) {
+            // Random flicker along the faulted line
+            const t = 0.3 + Math.random() * 0.4
+            ref.current.position.lerpVectors(startPos, endPos, t)
+            ref.current.material.opacity = Math.random() > 0.3 ? 0.8 : 0.1
+            ref.current.scale.setScalar(0.5 + Math.random() * 1.5)
+        }
+    })
 
     return (
         <mesh ref={ref}>
-            <sphereGeometry args={[size, 8, 8]} />
-            <meshBasicMaterial color={color} transparent opacity={0.5} />
+            <sphereGeometry args={[0.04, 6, 6]} />
+            <meshBasicMaterial color="#ff6600" transparent opacity={0.5} />
         </mesh>
     )
 }
@@ -250,46 +356,65 @@ function GridScene({ nodes, selectedNode, onNodeClick }) {
                 <meshStandardMaterial color="#0a0e1a" transparent opacity={0.5} />
             </mesh>
 
-            {/* Edges */}
-            {EDGES.map(([a, b]) => (
-                <PowerLine
-                    key={`${a}-${b}`}
-                    from={NODE_POSITIONS[a]}
-                    to={NODE_POSITIONS[b]}
-                    isBackup={false}
-                    isFaulted={faultedNodes.has(a) || faultedNodes.has(b)}
-                />
-            ))}
+            {/* Primary Edges */}
+            {EDGES.map(([a, b]) => {
+                const edgeFaulted = faultedNodes.has(a) || faultedNodes.has(b)
+                return (
+                    <React.Fragment key={`edge-group-${a}-${b}`}>
+                        <PowerLine
+                            from={NODE_POSITIONS[a]}
+                            to={NODE_POSITIONS[b]}
+                            isBackup={false}
+                            isFaulted={edgeFaulted}
+                            isActiveBackup={false}
+                        />
+                        {/* Flicker sparks on faulted edges */}
+                        {edgeFaulted && (
+                            <>
+                                <FaultedLineFlicker from={NODE_POSITIONS[a]} to={NODE_POSITIONS[b]} />
+                                <FaultedLineFlicker from={NODE_POSITIONS[a]} to={NODE_POSITIONS[b]} />
+                            </>
+                        )}
+                    </React.Fragment>
+                )
+            })}
 
             {/* Backup edges */}
             {BACKUP_EDGES.map(([a, b]) => {
-                const isActiveBackup = restoredNodes.has(a) || restoredNodes.has(b);
+                const isActiveBackup = restoredNodes.has(a) || restoredNodes.has(b)
                 return (
                     <React.Fragment key={`backup-group-${a}-${b}`}>
                         <PowerLine
-                            key={`backup-${a}-${b}`}
                             from={NODE_POSITIONS[a]}
                             to={NODE_POSITIONS[b]}
-                            isBackup={true}
-                            isActiveRestoration={isActiveBackup}
+                            isBackup={!isActiveBackup}
                             isFaulted={false}
+                            isActiveBackup={isActiveBackup}
                         />
+                        {/* Bright amber particles on active backup paths */}
                         {isActiveBackup && (
-                            <FlowParticle 
-                                key={`flow-backup-${a}-${b}`} 
-                                from={NODE_POSITIONS[a]} 
-                                to={NODE_POSITIONS[b]} 
-                                intensity={2.5}
+                            <FlowParticles
+                                from={NODE_POSITIONS[a]}
+                                to={NODE_POSITIONS[b]}
+                                count={4}
                                 color="#f59e0b"
+                                speed={0.5}
                             />
                         )}
                     </React.Fragment>
                 )
             })}
 
-            {/* Flow particles on healthy active edges */}
+            {/* Flow particles on healthy active edges (3 per edge) */}
             {EDGES.filter(([a, b]) => !faultedNodes.has(a) && !faultedNodes.has(b)).map(([a, b]) => (
-                <FlowParticle key={`flow-${a}-${b}`} from={NODE_POSITIONS[a]} to={NODE_POSITIONS[b]} />
+                <FlowParticles
+                    key={`flow-${a}-${b}`}
+                    from={NODE_POSITIONS[a]}
+                    to={NODE_POSITIONS[b]}
+                    count={3}
+                    color="#00d4ff"
+                    speed={0.3}
+                />
             ))}
 
             {/* Nodes */}
@@ -322,7 +447,7 @@ function NodeDetail({ nodeId, nodeData, onClose }) {
     if (!nodeData) return null
     const status = nodeData.status || 'healthy'
     return (
-        <div className="absolute bottom-4 left-4 glass-card neon-border p-4 w-64 animate-slide-up z-10">
+        <div className="absolute bottom-4 left-4 glass-card neon-border p-4 w-72 z-10" style={{ animation: 'slideUp 0.3s ease-out' }}>
             <div className="flex justify-between items-start mb-3">
                 <div>
                     <h3 className="font-bold text-sm neon-text">{nodeId}</h3>
@@ -336,9 +461,10 @@ function NodeDetail({ nodeId, nodeData, onClose }) {
                 <div className="flex justify-between"><span className="text-slate-500">Frequency</span><span>{nodeData.frequency_hz?.toFixed(3)} Hz</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Power</span><span>{nodeData.power_kw?.toFixed(2)} kW</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Load</span><span>{nodeData.load_kw?.toFixed(2)} kW</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Zone</span><span className="text-cyan-400">{nodeData.zone}</span></div>
                 {nodeData.fault_type && (
-                    <div className="flex justify-between text-red-400">
-                        <span>Fault</span><span>{nodeData.fault_type}</span>
+                    <div className="flex justify-between text-red-400 font-semibold pt-1 border-t border-red-900/30">
+                        <span>⚠ Fault</span><span>{nodeData.fault_type} ({nodeData.fault_severity})</span>
                     </div>
                 )}
             </div>
@@ -358,16 +484,23 @@ export default function GridMap3D() {
         return nodes.find(n => n.node_id === selectedNode)
     }, [selectedNode, nodes])
 
+    // Count statuses for the header
+    const statusCounts = useMemo(() => {
+        const counts = { healthy: 0, fault: 0, isolated: 0, restored: 0 }
+        nodes.forEach(n => { if (counts[n.status] !== undefined) counts[n.status]++ })
+        return counts
+    }, [nodes])
+
     return (
         <div className="glass-card relative flex-1 overflow-hidden" style={{ minHeight: '400px' }}>
             {/* Header */}
             <div className="absolute top-3 left-4 z-10 flex items-center gap-2">
                 <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">3D Grid Topology</h2>
                 <div className="flex gap-2 ml-3">
-                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Healthy</span>
-                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Fault</span>
-                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-slate-500 inline-block" /> Isolated</span>
-                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Restored</span>
+                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> {statusCounts.healthy}</span>
+                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> {statusCounts.fault}</span>
+                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-slate-500 inline-block" /> {statusCounts.isolated}</span>
+                    <span className="flex items-center gap-1 text-[10px]"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> {statusCounts.restored}</span>
                 </div>
             </div>
 
