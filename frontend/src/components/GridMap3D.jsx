@@ -45,6 +45,57 @@ const STATUS_COLORS = {
 
 /* ─── Animated Node Sphere ─────────────────────────────────────────────────── */
 
+/* ─── Spark Effect for Faults ──────────────────────────────────────────────── */
+
+function SparkEffect({ position }) {
+    const points = useMemo(() => {
+        const p = []
+        for (let i = 0; i < 15; i++) {
+            p.push(new THREE.Vector3(
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 0.8
+            ))
+        }
+        return p
+    }, [])
+
+    const lines = useMemo(() => {
+        const l = []
+        for (let i = 0; i < 8; i++) {
+            l.push([Math.floor(Math.random() * 15), Math.floor(Math.random() * 15)])
+        }
+        return l
+    }, [])
+
+    const ref = useRef()
+    useFrame((state) => {
+        if (ref.current) {
+            ref.current.rotation.x += 0.2
+            ref.current.rotation.y += 0.2
+            const s = 0.8 + Math.sin(state.clock.elapsedTime * 20) * 0.2
+            ref.current.scale.setScalar(s)
+            ref.current.visible = Math.random() > 0.3 // Flickering
+        }
+    })
+
+    return (
+        <group position={position} ref={ref}>
+            {lines.map(([i, j], idx) => (
+                <Line
+                    key={idx}
+                    points={[points[i], points[j]]}
+                    color="#ffffff"
+                    lineWidth={1.5}
+                    transparent
+                    opacity={0.8}
+                />
+            ))}
+            <pointLight distance={1.5} intensity={5} color="#ef4444" />
+        </group>
+    )
+}
+
 function GridNode({ nodeId, position, nodeData, onClick }) {
     const meshRef = useRef()
     const glowRef = useRef()
@@ -74,6 +125,9 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
 
     return (
         <group position={position} onClick={(e) => { e.stopPropagation(); onClick?.(nodeId, nodeData) }}>
+            {/* Spark effect if faulted */}
+            {isFault && <SparkEffect position={[0, 0, 0]} />}
+
             {/* Glow sphere */}
             <mesh ref={glowRef}>
                 <sphereGeometry args={[size * 2, 16, 16]} />
@@ -122,21 +176,18 @@ function GridNode({ nodeId, position, nodeData, onClick }) {
 
 /* ─── Animated Power Flow Line ─────────────────────────────────────────────── */
 
-function PowerLine({ from, to, isBackup, isFaulted }) {
-    const lineColor = isFaulted ? '#ef4444' : isBackup ? '#334155' : '#1e3a5f'
-    const points = useMemo(() => [
-        new THREE.Vector3(...from),
-        new THREE.Vector3(...to),
-    ], [from, to])
+function PowerLine({ from, to, isBackup, isFaulted, isActiveRestoration }) {
+    let lineColor = isFaulted ? '#ef4444' : isBackup ? '#334155' : '#1e3a5f'
+    if (isActiveRestoration) lineColor = '#f59e0b'
 
     return (
         <Line
-            points={points}
+            points={[new THREE.Vector3(...from), new THREE.Vector3(...to)]}
             color={lineColor}
-            lineWidth={isBackup ? 1 : 2}
-            dashed={isBackup}
+            lineWidth={isActiveRestoration ? 3 : (isBackup ? 1 : 2)}
+            dashed={isBackup && !isActiveRestoration}
             dashScale={5}
-            opacity={isBackup ? 0.3 : 0.7}
+            opacity={isBackup && !isActiveRestoration ? 0.3 : (isActiveRestoration ? 1 : 0.7)}
             transparent
         />
     )
@@ -144,7 +195,7 @@ function PowerLine({ from, to, isBackup, isFaulted }) {
 
 /* ─── Flow Particles ───────────────────────────────────────────────────────── */
 
-function FlowParticle({ from, to }) {
+function FlowParticle({ from, to, intensity = 1, color = "#00d4ff" }) {
     const ref = useRef()
     const startPos = useMemo(() => new THREE.Vector3(...from), [from])
     const endPos = useMemo(() => new THREE.Vector3(...to), [to])
@@ -152,16 +203,18 @@ function FlowParticle({ from, to }) {
 
     useFrame((state) => {
         if (ref.current) {
-            const t = ((state.clock.elapsedTime * 0.3 + offset) % 1)
+            const t = ((state.clock.elapsedTime * (0.3 * intensity) + offset) % 1)
             ref.current.position.lerpVectors(startPos, endPos, t)
             ref.current.material.opacity = Math.sin(t * Math.PI) * 0.8
         }
     })
 
+    const size = 0.05 * intensity
+
     return (
         <mesh ref={ref}>
-            <sphereGeometry args={[0.05, 8, 8]} />
-            <meshBasicMaterial color="#00d4ff" transparent opacity={0.5} />
+            <sphereGeometry args={[size, 8, 8]} />
+            <meshBasicMaterial color={color} transparent opacity={0.5} />
         </mesh>
     )
 }
@@ -217,11 +270,18 @@ function GridScene({ nodes, selectedNode, onNodeClick }) {
                             key={`backup-${a}-${b}`}
                             from={NODE_POSITIONS[a]}
                             to={NODE_POSITIONS[b]}
-                            isBackup={!isActiveBackup}
+                            isBackup={true}
+                            isActiveRestoration={isActiveBackup}
                             isFaulted={false}
                         />
                         {isActiveBackup && (
-                            <FlowParticle key={`flow-backup-${a}-${b}`} from={NODE_POSITIONS[a]} to={NODE_POSITIONS[b]} />
+                            <FlowParticle 
+                                key={`flow-backup-${a}-${b}`} 
+                                from={NODE_POSITIONS[a]} 
+                                to={NODE_POSITIONS[b]} 
+                                intensity={2.5}
+                                color="#f59e0b"
+                            />
                         )}
                     </React.Fragment>
                 )
