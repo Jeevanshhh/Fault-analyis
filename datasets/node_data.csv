@@ -1,0 +1,13 @@
+node_id,type,capacity_kw,zone,is_source,pos_x,pos_y
+bus_1,substation,2000,zone_a,True,3.0,0.0
+bus_2,feeder,1000,zone_a,False,2.5,1.0
+bus_3,feeder,800,zone_a,False,2.0,1.0
+bus_4,feeder,500,zone_b,False,1.5,2.0
+bus_5,feeder,400,zone_b,False,1.5,2.0
+bus_6,feeder,350,zone_b,False,0.5,2.0
+bus_7,feeder,300,zone_c,False,0.0,1.5
+bus_8,load_node,250,zone_c,False,1.0,3.0
+bus_9,load_node,200,zone_c,False,2.0,2.5
+bus_10,load_node,200,zone_d,False,3.0,1.5
+bus_11,load_node,150,zone_d,False,2.5,0.5
+bus_12,load_node,120,zone_d,False,1.5,0.0

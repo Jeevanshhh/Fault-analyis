@@ -1,0 +1,20 @@
+{
+    "Accuracy": 1.0,
+    "Precision (Macro)": 1.0,
+    "Recall (Macro)": 1.0,
+    "Best_Params": {
+        "max_depth": 15,
+        "min_samples_split": 2,
+        "n_estimators": 200
+    },
+    "Confusion_Matrix": [
+        [
+            95032,
+            0
+        ],
+        [
+            0,
+            4968
+        ]
+    ]
+}

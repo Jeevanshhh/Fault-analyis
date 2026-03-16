@@ -1,0 +1,33 @@
+=========================================
+      SHDN SYSTEM STRESS TEST LOG        
+=========================================
+
+Starting Stress Tests...
+
+[SCENARIO 3] Multiple Simultaneous Faults (bus_4, bus_7, bus_9)
+  Injecting fault at bus_4: 200
+  Injecting fault at bus_7: 200
+  Injecting fault at bus_9: 200
+  Waiting for algorithms to process restorations...
+  ... active faults remaining: 3
+  ... active faults remaining: 1
+  [SUCCESS] All simultaneous faults restored in 10.93s
+
+[SCENARIO 2] Extreme Grid Overload
+  Injecting Overload at Substation Feeder (bus_2): 200
+  Grid Stats -> Current: 13.9A, Load: 261.51kW
+  [SUCCESS] bus_2 Restored successfully in 6.11s
+
+[SCENARIO 1] Severe Storm Fault Cascade
+  Injecting rapid random faults simulating lightning strikes...
+  Lightning strike at bus_1
+  Lightning strike at bus_10
+  Lightning strike at bus_5
+  Lightning strike at bus_5
+  Lightning strike at bus_4
+  Observing storm cascade...
+  Active Faults mid-storm: 1
+  [SUCCESS] Storm cascade mitigated and restored in 2.27s
+
+=========================================
+  Stress Test Suite Completed

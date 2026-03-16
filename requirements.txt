@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+websockets
+numpy
+pandas
+scikit-learn
+tensorflow
+keras
+networkx
+matplotlib
+seaborn
+joblib
+python-multipart
+scipy
+matlabengine

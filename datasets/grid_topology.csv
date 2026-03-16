@@ -1,0 +1,17 @@
+from_node,to_node,capacity_kw,status
+bus_1,bus_2,1000,active
+bus_1,bus_3,800,active
+bus_2,bus_4,500,active
+bus_2,bus_5,400,active
+bus_3,bus_6,350,active
+bus_3,bus_7,300,active
+bus_4,bus_8,250,active
+bus_5,bus_9,200,active
+bus_6,bus_10,200,active
+bus_7,bus_11,150,active
+bus_8,bus_12,120,active
+bus_4,bus_6,180,backup
+bus_5,bus_7,160,backup
+bus_9,bus_10,140,backup
+bus_10,bus_11,130,backup
+bus_11,bus_12,100,backup
