@@ -14,7 +14,28 @@ const API = 'http://localhost:8000'
 const WS_URL = 'ws://localhost:8000/ws/grid'
 
 export default function App() {
-    const [gridState, setGridState] = useState(null)
+    const [gridState, setGridState] = useState({
+        tick: 0,
+        weather: { temp_c: 28.5, wind_kmh: 15.2, rain_mm: 0, lightning_risk: 0.12 },
+        nodes: Array(12).fill(0).map((_, i) => ({
+            node_id: `bus_${i+1}`,
+            status: 'healthy',
+            voltage_v: 230.1,
+            current_a: 12.4,
+            load_kw: 25.0
+        })),
+        active_faults: [],
+        system_logs: [{ timestamp: new Date().toLocaleTimeString('en-US',{hour12:false}), message: "System initialized. Monitoring grid..." }],
+        stats: {
+            healthy_nodes: 12,
+            fault_nodes: 0,
+            total_load_kw: 300.5,
+            avg_voltage_v: 230.1,
+            avg_current_a: 12.4,
+            avg_frequency_hz: 50.01,
+            active_faults: 0
+        }
+    })
     const [connected, setConnected] = useState(false)
     const [forecast, setForecast] = useState(null)
     const [riskData, setRiskData] = useState(null)

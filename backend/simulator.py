@@ -79,6 +79,7 @@ class GridSimulator:
         self._lock = threading.Lock()
         self._running = False
         self._tick = 0
+        self._auto_demo_triggered = False
 
     # ── Logs ──────────────────────────────────────────────────────────────────
 
@@ -133,10 +134,6 @@ class GridSimulator:
         if not candidates:
             return
 
-        # Auto-Demo System: Ensure smooth clean run for the first 15 seconds
-        if self._tick < 20: 
-            return
-
         target = random.choice(candidates)
         fault_types = [
             "line_fault",
@@ -176,7 +173,7 @@ class GridSimulator:
             if len(self.fault_history) > 200:
                 self.fault_history.pop()
 
-            self._add_log(f"Fault detected at {target} ({severity} {ftype})")
+            self._add_log(f"Fault detected at {target.capitalize()}")
 
         # Try to execute the EMT simulation via MATLAB in parallel
         def _run_matlab_emt():
@@ -210,9 +207,10 @@ class GridSimulator:
                 self.nodes[node_id]["status"] = "isolated"
                 self.nodes[node_id]["voltage_v"] = 0.0
                 self.nodes[node_id]["current_a"] = 0.0
-            self._add_log(f"Opening breakers around {node_id}")
-            self._add_log("Isolation complete")
-            self._add_log("Searching alternate feeder")
+            self._add_log(f"Opening breakers")
+            
+        # Schedule isolation complete log shortly after
+        threading.Timer(2.0, lambda: self._add_log("Isolation complete")).start()
 
         # Phase 3: Restoration
         rest_time = min(
@@ -233,8 +231,8 @@ class GridSimulator:
                 if h["id"] == fault_id:
                     h["status"] = "restored"
                     break
-            self._add_log("Restoration path found")
-            self._add_log(f"Power rerouted to {node_id}. System stabilized.")
+            self._add_log("Alternate path found")
+            threading.Timer(2.0, lambda: self._add_log("Power restored")).start()
 
         # Return to healthy after another few seconds showing it holding
         threading.Timer(5.0, self._clear_restored, args=[node_id]).start()
@@ -318,7 +316,7 @@ class GridSimulator:
             }
             self.active_faults.append(event)
             self.fault_history.insert(0, event)
-            self._add_log(f"Fault detected at {node_id} ({fault_type})")
+            self._add_log(f"Fault detected at {node_id.capitalize()}")
             
         def _run_matlab_emt():
             if matlab_connector.connect():
@@ -329,6 +327,7 @@ class GridSimulator:
         threading.Thread(target=_run_matlab_emt, daemon=True).start()
 
         # Call FLISR manually
+        self._add_log("Running FLISR")
         threading.Timer(2.0, self._trigger_flisr, args=[node_id, event["id"]]).start()
         return event
 
@@ -339,15 +338,12 @@ class GridSimulator:
             self._tick += 1
             self._tick_update()
             
-            # --- Auto Demo Sequence ---
-            # Automatically trigger a structured fault at exactly 15 seconds
-            # for the cinematic recording sequence as requested in the Master Workflow
-            if self._tick == 15 and len(self.active_faults) == 0:
-                self._add_log("Auto-Demo: Triggering scheduled fault")
+            # Auto-run structured demo trigger
+            if self._tick == 15 and not self._auto_demo_triggered:
                 self.inject_fault_manual("bus_4", "line_fault")
-            else:
-                self._inject_fault()
+                self._auto_demo_triggered = True
                 
+            self._inject_fault()
             time.sleep(1.0)  # 1-second tick
 
     def start(self):
