@@ -33,10 +33,16 @@ class MATLABConnector:
 
         print("Starting MATLAB Engine... This may take a minute.")
         try:
-            self.eng = matlab.engine.start_matlab("-desktop")
+            self.eng = matlab.engine.start_matlab()
             # Add simulink model directory to MATLAB path
             simulink_dir = str(Path(__file__).parent.parent / "simulink")
             self.eng.addpath(simulink_dir, nargout=0)
+            
+            # Build the model if .slx does not exist yet
+            slx_path = Path(simulink_dir) / f"{self.model_name}.slx"
+            if not slx_path.exists():
+                print("Building Simulink model from script...")
+                self.eng.eval("build_shdn_simulink", nargout=0)
             
             # Load the model into memory
             self.eng.eval(f"load_system('{self.model_name}')", nargout=0)
