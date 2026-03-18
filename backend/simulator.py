@@ -133,6 +133,10 @@ class GridSimulator:
         if not candidates:
             return
 
+        # Auto-Demo System: Ensure smooth clean run for the first 15 seconds
+        if self._tick < 20: 
+            return
+
         target = random.choice(candidates)
         fault_types = [
             "line_fault",
@@ -334,7 +338,16 @@ class GridSimulator:
         while self._running:
             self._tick += 1
             self._tick_update()
-            self._inject_fault()
+            
+            # --- Auto Demo Sequence ---
+            # Automatically trigger a structured fault at exactly 15 seconds
+            # for the cinematic recording sequence as requested in the Master Workflow
+            if self._tick == 15 and len(self.active_faults) == 0:
+                self._add_log("Auto-Demo: Triggering scheduled fault")
+                self.inject_fault_manual("bus_4", "line_fault")
+            else:
+                self._inject_fault()
+                
             time.sleep(1.0)  # 1-second tick
 
     def start(self):
