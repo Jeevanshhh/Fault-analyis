@@ -80,6 +80,7 @@ class GridSimulator:
         self._running = False
         self._tick = 0
         self._auto_demo_triggered = False
+        self.graph_data = []
 
     # ── Logs ──────────────────────────────────────────────────────────────────
 
@@ -264,6 +265,32 @@ class GridSimulator:
         # Refresh weather every 60 ticks (1 minute)
         if self._tick % 60 == 0:
             self.weather = self._gen_weather()
+            
+        with self._lock:
+            # Calculate metrics for graph
+            min_v = min(n["voltage_v"] for n in self.nodes.values())
+            max_c = max(n["current_a"] for n in self.nodes.values())
+            
+            # Determine global state string for shading
+            current_state = "healthy"
+            if any(n["status"] == "fault" for n in self.nodes.values()):
+                current_state = "fault"
+            elif any(n["status"] == "isolated" for n in self.nodes.values()):
+                current_state = "isolation"
+            elif any(n["status"] == "restored" for n in self.nodes.values()):
+                current_state = "recovery"
+                
+            self.graph_data.append({
+                "time": self._tick,
+                "time_str": datetime.utcnow().strftime("%H:%M:%S"),
+                "voltage": round(min_v, 1),
+                "current": round(max_c, 1),
+                "state": current_state
+            })
+            
+            # Keep last 35 points for a scrolling graph effect
+            if len(self.graph_data) > 35:
+                self.graph_data.pop(0)
 
     def get_state(self) -> dict:
         with self._lock:
@@ -275,6 +302,7 @@ class GridSimulator:
                 "active_faults": list(self.active_faults),
                 "system_logs": list(self.system_logs),
                 "stats": self._compute_stats(),
+                "graph_data": list(self.graph_data),
             }
 
     def _compute_stats(self) -> dict:

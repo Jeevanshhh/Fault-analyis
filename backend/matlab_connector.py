@@ -7,9 +7,12 @@ import sys
 import os
 import threading
 from pathlib import Path
+import time
 
 try:
     import matlab.engine
+    import numpy as np
+    import json
     MATLAB_AVAILABLE = True
 except ImportError:
     MATLAB_AVAILABLE = False
@@ -90,13 +93,42 @@ class MATLABConnector:
                 print(f"Running Simulink model '{self.model_name}' for {duration_s}s...")
                 self.eng.workspace['sim_time'] = duration_s
                 
-                # Setup out=sim(...) in MATLAB workspace
+                # Execute simulation
                 cmd = f"out = sim('{self.model_name}', 'StopTime', num2str(sim_time));"
                 self.eng.eval(cmd, nargout=0)
                 
-                # Fetch results from the Outport or ToWorkspace blocks
-                # V_rms and I_rms arrays assuming they were logged
-                # We'll return a simulated summary dict here
+                # Fetch results from the ToWorkspace blocks
+                try:
+                    # 'V_out', 'I_out', 'tout' must be configured in Simulink
+                    V_out = self.eng.workspace['V_out']
+                    I_out = self.eng.workspace['I_out']
+                    tout = self.eng.workspace['tout']
+                    
+                    V_np = np.array(V_out).flatten()
+                    I_np = np.array(I_out).flatten()
+                    t_np = np.array(tout).flatten()
+                    
+                    # Downsample to avoid gigantic files
+                    V_sampled = V_np[::100].tolist()
+                    I_sampled = I_np[::100].tolist()
+                    t_sampled = t_np[::100].tolist()
+                    
+                    # Save to results/matlab_outputs/
+                    out_dir = Path(__file__).parent.parent / "results" / "matlab_outputs"
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    file_path = out_dir / f"transient_sim_{int(time.time())}.json"
+                    with open(file_path, 'w') as f:
+                        json.dump({
+                            "time": t_sampled,
+                            "voltage": V_sampled,
+                            "current": I_sampled,
+                            "duration_s": duration_s
+                        }, f)
+                    
+                    print(f"MATLAB data extracted and saved to {file_path}")
+                except Exception as ex:
+                    print(f"Warning: Could not extract V_out/I_out arrays. Ensure 'To Workspace' blocks exist in Simulink model. ({ex})")
                 
                 return {
                     "status": "success",

@@ -3,7 +3,8 @@ import StatsBar from './components/StatsBar'
 import GridMap3D from './components/GridMap3D'
 import FaultPanel from './components/FaultPanel'
 import AIPredictionPanel from './components/AIPredictionPanel'
-import ConsumerPanel from './components/ConsumerPanel'
+import SystemBehaviorGraph from './components/SystemBehaviorGraph'
+import SystemReportPanel from './components/SystemReportPanel'
 import SystemLogPanel from './components/SystemLogPanel'
 
 // ─── Grid Context ────────────────────────────────────────────────────────────
@@ -26,6 +27,13 @@ export default function App() {
         })),
         active_faults: [],
         system_logs: [{ timestamp: new Date().toLocaleTimeString('en-US',{hour12:false}), message: "System initialized. Monitoring grid..." }],
+        graph_data: Array(35).fill(0).map((_, i) => ({
+            time: Number(i),
+            time_str: new Date(Date.now() - (35 - i) * 1000).toLocaleTimeString('en-US',{hour12:false}),
+            voltage: 230.1,
+            current: 12.4,
+            state: "healthy"
+        })),
         stats: {
             healthy_nodes: 12,
             fault_nodes: 0,
@@ -138,17 +146,22 @@ export default function App() {
                     <StatsBar />
                 </div>
 
-                {/* Left: 3D Grid Visualization */}
+                {/* Left: 3D Grid Visualization and System Behavior Graph */}
                 <div className="main-panel">
-                    <GridMap3D />
+                    <div className="flex-grow basis-0 min-h-0 relative rounded-xl overflow-hidden glass-card">
+                        <GridMap3D />
+                    </div>
+                    <div className="h-[260px] shrink-0">
+                        <SystemBehaviorGraph />
+                    </div>
                 </div>
 
                 {/* Right: Side Panels */}
                 <div className="side-panels">
+                    <SystemReportPanel />
                     <SystemLogPanel />
                     <FaultPanel />
                     <AIPredictionPanel />
-                    <ConsumerPanel />
                 </div>
             </div>
         </GridContext.Provider>
